@@ -51,7 +51,7 @@
 import { requireAuth, initLockButton } from './assets/js/auth.js';
 await requireAuth();
 initLockButton();
-import { loadManifest, formatBytes, initLightbox, initFooter } from './assets/js/common.js';
+import { loadManifest, loadPhotoThumb, formatBytes, initLightbox, initFooter } from './assets/js/common.js';
 
 initFooter();
 const manifest = await loadManifest();
@@ -63,7 +63,7 @@ for (const item of manifest.floorPlan) {
   el.dataset.lightbox = item.file;
   el.dataset.title = item.title;
   el.innerHTML = `
-    <div class="thumb"><img src="${item.thumb}" alt="${item.title}" loading="lazy"></div>
+    <div class="thumb"><img alt="${item.title}"></div>
     <div class="body">
       <h3>${item.title}</h3>
       <div class="meta">
@@ -72,6 +72,13 @@ for (const item of manifest.floorPlan) {
       </div>
     </div>`;
   grid.appendChild(el);
+
+  // The thumbnails are encrypted, so they are decrypted and shown from a
+  // blob URL.
+  loadPhotoThumb(item).then((url) => {
+    const img = el.querySelector('img');
+    if (url) img.src = url;
+  });
 }
 
 initLightbox('#floorplan-cards');

@@ -79,7 +79,7 @@
 import { requireAuth, initLockButton } from './assets/js/auth.js';
 await requireAuth();
 initLockButton();
-import { loadManifest, formatBytes, formatMetres, initLightbox, initFooter } from './assets/js/common.js';
+import { loadManifest, loadPhotoThumb, formatBytes, formatMetres, initLightbox, initFooter } from './assets/js/common.js';
 
 initFooter();
 
@@ -114,7 +114,7 @@ function photoCard(item) {
   el.dataset.lightbox = item.file;
   el.dataset.title = item.title;
   el.innerHTML = `
-    <div class="thumb"><img src="${item.thumb}" alt="${item.title}" loading="lazy"></div>
+    <div class="thumb"><img alt="${item.title}"></div>
     <div class="body">
       <h3>${item.title}</h3>
       <div class="meta">
@@ -122,6 +122,12 @@ function photoCard(item) {
         <span>${formatBytes(item.bytes)}</span>
       </div>
     </div>`;
+  // The thumbnails are encrypted, so they are decrypted and shown from a
+  // blob URL.
+  loadPhotoThumb(item).then((url) => {
+    const img = el.querySelector('img');
+    if (url) img.src = url;
+  });
   return el;
 }
 

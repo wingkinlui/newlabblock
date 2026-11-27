@@ -20,6 +20,7 @@ import { Line2 } from 'three/addons/Line2.js';
 import { LineGeometry } from 'three/addons/LineGeometry.js';
 import { LineMaterial } from 'three/addons/LineMaterial.js';
 import { MeshBVH } from 'three-mesh-bvh';
+import { loadDecryptedGLTF, loadDecryptedJSON } from './crypto.js';
 
 const EYE_HEIGHT = 1.62;
 const WALK_SPEED = 2.4;
@@ -203,13 +204,12 @@ export class LabViewer {
     this.onStatus('Loading 3D model...');
 
     // --- collision / walkability grid -----------------------------------
+    // The grid is stored encrypted; it is decrypted with the key derived
+    // from the site password.
     this.collision = null;
     if (collisionUrl) {
-      const res = await fetch(collisionUrl);
-      if (res.ok) {
-        const data = await res.json();
-        this.collision = { ...data, cells: decodeGrid(data) };
-      }
+      const data = await loadDecryptedJSON(collisionUrl);
+      this.collision = { ...data, cells: decodeGrid(data) };
     }
 
     // --- model ------------------------------------------------------------
@@ -218,7 +218,7 @@ export class LabViewer {
     draco.setDecoderPath('assets/vendor/draco/');
     loader.setDRACOLoader(draco);
 
-    const gltf = await loader.loadAsync(modelInfo.file);
+    const gltf = await loadDecryptedGLTF(loader, modelInfo.file);
     this.model = gltf.scene;
 
     // Build a BVH per mesh so picking (and measurement) stays fast.

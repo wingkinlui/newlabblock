@@ -40,9 +40,9 @@ for (const room of rooms) {
   // Install an in-page probe that samples the position every animation frame
   // and records any position that is not on a walkable cell.
   await page.evaluate(async () => {
-    const res = await fetch('assets/collision/'
+    const mod = await import('./assets/js/crypto.js');
+    const d = await mod.loadDecryptedJSON('assets/collision/'
       + new URLSearchParams(location.search).get('model') + '.collision.json');
-    const d = await res.json();
     window.__grid = d;
 
     // Decode the run-length encoded grid: each row is a flat

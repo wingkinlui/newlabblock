@@ -1,10 +1,27 @@
 /* Shared helpers for every page: manifest loading + the photo lightbox. */
 
+import { loadDecryptedImage } from './crypto.js';
+
 /** Fetch the generated asset manifest. */
 export async function loadManifest() {
   const res = await fetch('assets/manifest.json');
   if (!res.ok) throw new Error(`manifest.json: ${res.status}`);
   return res.json();
+}
+
+/**
+ * Load an encrypted image and return an object URL for it.
+ *
+ * The photos are stored as AES-GCM ciphertext, so they cannot be handed to
+ * the browser directly with an <img src>; they have to be decrypted first.
+ */
+export async function loadPhotoThumb(item) {
+  try {
+    return await loadDecryptedImage(item.thumb);
+  } catch (err) {
+    console.warn('could not load thumbnail', item.thumb, err);
+    return '';
+  }
 }
 
 /** Human readable byte size. */
@@ -50,13 +67,28 @@ export function initLightbox(groupSelector = '.card-grid') {
   const title = box.querySelector('.lb-title');
   let items = [];
   let index = 0;
+  const cache = new Map();
 
-  function show(i) {
+  async function show(i) {
     index = (i + items.length) % items.length;
     const item = items[index];
-    img.src = item.full;
-    img.alt = item.title;
     title.textContent = `${item.title}  (${index + 1} / ${items.length})`;
+    img.src = '';
+    img.alt = item.title;
+
+    // The full-size photo is encrypted, so it has to be fetched and
+    // decrypted before it can be shown.
+    try {
+      let url = cache.get(item.full);
+      if (!url) {
+        url = await loadDecryptedImage(item.full);
+        cache.set(item.full, url);
+      }
+      img.src = url;
+    } catch (err) {
+      console.warn('could not load the full-size photo', err);
+      title.textContent = `${item.title}  - could not be loaded`;
+    }
   }
 
   function open(i) {

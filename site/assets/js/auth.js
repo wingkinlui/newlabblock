@@ -82,11 +82,9 @@ export function lock() {
     localStorage.removeItem(STORAGE_KEY);
   } catch { /* ignore */ }
   setCookie('0', 0);
-  setUnlockedFlag(false);
-  // Tell the service worker to block the protected assets again.
-  navigator.serviceWorker?.controller?.postMessage({ type: 'NLB_LOCK' });
-  navigator.serviceWorker?.ready
-    .then((reg) => reg.active?.postMessage({ type: 'NLB_LOCK' }))
+  // Drop the stored asset decryption key.
+  import('./crypto.js')
+    .then((m) => m.clearAssetKey())
     .catch(() => {});
   location.reload();
 }
@@ -94,9 +92,8 @@ export function lock() {
 /**
  * Tell the service worker that the visitor has unlocked the site.
  *
- * The worker cannot read the unlock cookie (browsers strip the Cookie
- * header from requests inside a service worker), so the page has to tell it
- * explicitly.
+ * The worker only provides offline caching now, so this is a no-op hint that
+ * lets it refresh its cache of the shell files.
  */
 function notifyServiceWorkerUnlocked() {
   const post = (target) => {
@@ -144,7 +141,8 @@ function buildGate() {
     button.textContent = 'Checking...';
 
     try {
-      const candidate = await derive(input.value);
+      const password = input.value;
+      const candidate = await derive(password);
       if (!safeEqual(candidate, AUTH_CONFIG.hash)) {
         error.hidden = false;
         input.value = '';
@@ -160,10 +158,18 @@ function buildGate() {
       } catch { /* ignore */ }
       setCookie('1', 7);
       document.documentElement.classList.remove('is-locked');
+
+      // Derive the asset decryption key from the password.  This has to happen
+      // before the form is removed, because removing it clears the input.
+      try {
+        const { setAssetKey } = await import('./crypto.js');
+        await setAssetKey(password);
+      } catch (err) {
+        console.warn('could not derive the asset key', err);
+      }
+
       gateEl.remove();
       gateEl = null;
-      // Persist the flag so the service worker lets the assets through.
-      await setUnlockedFlag(true);
       notifyServiceWorkerUnlocked();
       if (resolver) resolver();
     } catch (err) {
@@ -184,12 +190,17 @@ function buildGate() {
  * Resolves once the site may be shown; the caller can then load the heavy
  * assets.  On an already-unlocked browser it resolves immediately.
  */
-export function requireAuth() {
+export async function requireAuth() {
+  // Register the service worker for offline support.
+  registerServiceWorker();
+
   if (isUnlocked()) {
     document.documentElement.classList.remove('is-locked');
-    registerServiceWorker();
     notifyServiceWorkerUnlocked();
-    return Promise.resolve();
+    // Restore the asset decryption key saved in a previous session, so the
+    // page can decrypt the models and photos straight away.
+    await restoreAssetKey();
+    return;
   }
 
   buildGate();
@@ -199,47 +210,23 @@ export function requireAuth() {
   });
 }
 
-/* ------------------------------------------------------- unlock database */
-
-/*
- * The unlock flag lives in IndexedDB so that both the page and the service
- * worker can read it.  A cookie cannot be used: browsers strip the Cookie
- * header from Request objects inside a service worker.
- */
-const DB_NAME = 'nlb-auth';
-const DB_STORE = 'state';
-const UNLOCK_KEY = 'unlocked';
-
-function openAuthDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(DB_STORE)) {
-        request.result.createObjectStore(DB_STORE);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-/** Persist the unlock flag so the service worker can see it. */
-export async function setUnlockedFlag(value) {
+/** Re-import the crypto helpers (kept in a function to avoid a cycle). */
+async function restoreAssetKey() {
   try {
-    const db = await openAuthDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(DB_STORE, 'readwrite');
-      tx.objectStore(DB_STORE).put(value, UNLOCK_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch {
-    /* storage is optional - the worker falls back to the message below */
+    const { restoreAssetKey: restore } = await import('./crypto.js');
+    await restore();
+  } catch (err) {
+    console.warn('could not restore the asset key', err);
   }
 }
 
+/* ------------------------------------------------------- unlock database */
+
 /**
- * Register the Service Worker that blocks direct asset access.
+ * Register the Service Worker that provides offline caching.
+ *
+ * NOTE: on the very first visit the worker is installed but does not control
+ * the page yet, so it cannot intercept the requests of that first page load.
  */
 export async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;

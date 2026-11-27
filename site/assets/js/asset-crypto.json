@@ -1,0 +1,7 @@
+{
+  "salt": "jwxCBoVekkbkeoAnsmaMww==",
+  "iterations": 600000,
+  "keyLength": 32,
+  "nonceLength": 12,
+  "encrypted": true
+}

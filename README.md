@@ -36,28 +36,51 @@ cell of a 15 cm grid over the floor plan is marked as *void*, *blocked* or
 
 ## Password protection
 
-GitHub Pages is a static host with no server-side authentication, so the gate
-runs in the browser:
+GitHub Pages is a static host with no server-side authentication, so the
+protection is built into the files themselves:
 
-1. `assets/js/auth-config.js` holds a **PBKDF2-HMAC-SHA256** hash of the
-   password (150 000 iterations, random salt). The plaintext is never stored.
-2. `assets/js/auth.js` shows the password form and derives the hash of what
-   the visitor types to compare it with the stored one.
-3. `sw.js` (a Service Worker) blocks direct requests for the models, photos
-   and collision data until the site has been unlocked, so guessing an asset
-   URL is not enough.
+1. **The assets are encrypted.** The 3D models, the photos and the collision
+   grids are stored as **AES-256-GCM ciphertext**. The key is derived from the
+   password with PBKDF2-HMAC-SHA256 (600 000 iterations). Someone who
+   downloads the files from the repository gets unreadable data — there is no
+   readable GLB, JPEG or JSON in the published site.
+2. **The password itself is never stored.** `assets/js/auth-config.js` holds a
+   separate PBKDF2-HMAC-SHA256 hash (150 000 iterations) of the password.
+   `assets/js/auth.js` derives the hash of what the visitor types and
+   compares it.
+3. **The browser decrypts on the fly.** `assets/js/crypto.js` derives the
+   AES key after a successful unlock and decrypts each file in memory. The
+   model is handed to Three.js as a blob URL; photos become object URLs.
+4. **The key is kept safely.** The derived `CryptoKey` is stored in IndexedDB
+   as a *non-extractable* key, so a reload does not ask for the password
+   again while the raw key material never leaves the browser.
+5. **The gate covers the pages too.** The HTML/CSS/JS is served normally
+   (it has to be, so the browser can show the password form), but every page
+   is blank until the password is accepted.
 
-> **Note:** this is a strong deterrent, not a cryptographic guarantee. The
-> site files themselves are still downloadable from the GitHub repository by
-> anyone who can clone it. If the assets must stay truly private, keep the
-> repository itself private and share access through a GitHub organisation, or
-> host the site somewhere with real server-side auth (Cloudflare Access,
-> Netlify password protection, or a small server with HTTP basic auth).
+> **What this does and does not achieve:** the models and photos cannot be
+> extracted from the published site without the password, and the page content
+> is hidden until someone enters it. The remaining exposure is that the
+> *page code* itself is public — an attacker can see how the gate works.
+> That is inherent to a static host. If you need stronger guarantees, keep
+> the repository private as well (GitHub free accounts support private
+> repositories with Pages), or host the site somewhere with real server-side
+> authentication such as Cloudflare Access or Netlify password protection.
 
-To change the password, regenerate the hash:
+### Changing the password
+
+Both the verification hash and the encryption key are derived from the
+password, so they have to be regenerated together — and the assets have to be
+re-encrypted:
 
 ```bash
+# 1. new verification hash
 python tools/make_auth_config.py --password "new-password" --force
+
+# 2. restore the plaintext assets and re-encrypt them
+#    (rebuild them with tools/build_models.py + tools/build_assets.py,
+#     or restore from work/plaintext_assets/)
+python tools/encrypt_assets.py --password "new-password" --decrypt-check
 ```
 
 ## Rebuilding the assets
@@ -68,7 +91,7 @@ and are deliberately **not** committed (they are ~40 MB).
 
 ```bash
 # 1. one-off: create the build environment
-conda create -n labblock python=3.12 pillow numpy
+conda create -n labblock python=3.12 pillow numpy cryptography
 conda activate labblock
 
 # 2. build the 3D models (texture resize -> Draco compression -> collision grid)
@@ -77,15 +100,23 @@ python tools/build_models.py
 # 3. build the images and the manifest
 python tools/build_assets.py
 
-# 4. regenerate the password hash (only needed when the password changes)
+# 4. encrypt the assets with the site password
+python tools/encrypt_assets.py --password "..." --decrypt-check
+
+# 5. regenerate the password hash (only needed when the password changes)
 python tools/make_auth_config.py --password "..." --force
 ```
 
 `tools/build_models.py` needs Node for the Draco step:
 
 ```bash
-cd site && npm install three three-mesh-bvh gltf-pipeline && cd ..
+cd site && npm install && cd ..
 ```
+
+> The build order matters: `build_assets.py` and `build_models.py` write the
+> **plaintext** assets, and `encrypt_assets.py` then encrypts them in place.
+> Re-running the build scripts therefore un-encrypts the files, and
+> `encrypt_assets.py` must always be the last step.
 
 ### What the pipeline does
 
@@ -95,15 +126,16 @@ cd site && npm install three three-mesh-bvh gltf-pipeline && cd ..
 | Draco compression | Geometry is compressed (`gltf-pipeline`) |
 | Collision grid | A 15 cm walkability grid is derived from the geometry |
 | Image resize | Photos are downscaled to 2560 px and stripped of EXIF (GPS!) |
+| Encryption | Models, photos and grids are encrypted with AES-256-GCM |
 
 Results:
 
-| Capture | Original | Published |
-| --- | --- | --- |
-| Open Lab | 15.3 MB | 2.5 MB |
-| Type C Lab | 7.5 MB | 0.9 MB |
-| TF Office | 2.6 MB | 0.4 MB |
-| 12 photos | ~40 MB | 6.1 MB |
+| Capture | Original | Published (compressed) | Published (encrypted) |
+| --- | --- | --- | --- |
+| Open Lab | 15.3 MB | 2.5 MB | 2.5 MB |
+| Type C Lab | 7.5 MB | 0.9 MB | 0.9 MB |
+| TF Office | 2.6 MB | 0.4 MB | 0.4 MB |
+| 12 photos | ~40 MB | 6.1 MB | 6.1 MB |
 
 ## Local preview
 
@@ -120,8 +152,9 @@ than opening the files directly.
 
 ```bash
 cd site
-node tools/test_site.mjs        # end-to-end: gate, pages, 3D viewer, measuring
-node tools/test_collision.mjs   # the camera never leaves the walkable floor
+node tools/test_site.mjs          # end-to-end: gate, pages, 3D viewer, measuring
+node tools/test_collision.mjs     # the camera never leaves the walkable floor
+node tools/test_visitor_journey.mjs  # a fresh visitor: encrypted files, unlock, browse
 ```
 
 ## Credits
