@@ -37,7 +37,7 @@ TITLES = {
     "5F_FloorPlan": "5th Floor Plan",
     "5F_FloorPlan_Overlaid": "5th Floor Plan (annotated)",
     "Building": "New Building - Exterior",
-    "Corridor": "Main Corridor",
+    "Corridor": "1/F Corridor",
     "F_Toilet": "Ground Floor Toilet",
     "M_Toilet": "2nd Floor Toilet",
     "M_Toilet_2": "2nd Floor Toilet (view 2)",
