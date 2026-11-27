@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Models - New Lab Block</title>
+<meta name="description" content="Interactive 3D walkthrough of our labs captured with PolyCam.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127959;</text></svg>">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/auth.css">
+<link rel="stylesheet" href="assets/css/viewer.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./assets/vendor/three/three.module.min.js",
+    "three/addons/": "./assets/vendor/three/",
+    "three-mesh-bvh": "./assets/vendor/three-mesh-bvh.module.js"
+  }
+}
+</script>
+</head>
+<body class="viewer-page">
+
+<div id="viewer-root">
+  <canvas id="viewer-canvas"></canvas>
+
+  <div class="hud">
+    <div class="hud-top">
+      <div class="hud-panel model-switcher">
+        <span class="hud-label">Room</span>
+        <div id="model-buttons" class="model-buttons"></div>
+      </div>
+      <div class="hud-panel">
+        <span class="hud-label">Position</span>
+        <span id="position-readout" class="mono">-</span>
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <div class="hud-panel controls-help">
+        <div class="hud-label">Controls</div>
+        <div class="keys">
+          <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> walk</span>
+          <span><kbd>Shift</kbd> run</span>
+          <span><kbd>Mouse</kbd> / <kbd>drag</kbd> look</span>
+          <span><kbd>M</kbd> measure</span>
+          <span><kbd>R</kbd> reset view</span>
+          <span><kbd>Esc</kbd> release mouse</span>
+        </div>
+      </div>
+
+      <div class="hud-panel measure-panel" id="measure-panel" hidden>
+        <div class="hud-label">
+          Measurement
+          <button class="mini-btn" id="measure-clear" title="Clear measurements">Clear</button>
+        </div>
+        <div id="measure-readout" class="mono">Click points on the model to measure.</div>
+      </div>
+
+      <div class="hud-panel minimap-panel">
+        <canvas id="minimap" width="180" height="180"></canvas>
+      </div>
+    </div>
+
+    <div class="hud-status" id="hud-status"></div>
+
+    <div class="loader" id="loader">
+      <div class="loader-inner">
+        <div class="loader-spinner"></div>
+        <div id="loader-text">Preparing the model...</div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="info-panel" id="info-panel">
+    <button class="info-toggle" id="info-toggle" title="Room details">i</button>
+    <div class="info-body">
+      <h2 id="info-title">Room</h2>
+      <p id="info-subtitle" class="muted"></p>
+      <table class="data" id="info-table">
+        <tbody></tbody>
+      </table>
+    </div>
+  </aside>
+
+  <a class="back-link" href="index.html">&larr; Back to overview</a>
+</div>
+
+<footer class="site-footer">
+  <div class="inner">
+    <span>&copy; <span data-year>2026</span> New Lab Block &middot; shared with the lab</span>
+    <span>Distances are in metres, straight-line between the clicked points</span>
+  </div>
+</footer>
+
+<script type="module" src="assets/js/viewer-page.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Lab Block - virtual tour</title>
+<meta name="description" content="Photo tour and interactive 3D walkthrough of the new lab building: floor plans, site snapshots and PolyCam captures of our labs.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127959;</text></svg>">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="index.html"><span class="dot"></span> New Lab Block</a>
+    <nav class="site-nav">
+      <a href="index.html" class="active">Home</a>
+      <a href="3d.html">3D Models</a>
+      <a href="floorplan.html">Floor Plan</a>
+      <a href="snapshots.html">Snapshots</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="eyebrow">Site visit - 27 November 2026</div>
+    <h1>Welcome to our new lab building</h1>
+    <p>
+      A short tour of the place for the whole lab: walk through the 3D captures of our
+      rooms, check the 5th floor plan, and browse the photos taken on the day.
+    </p>
+    <div class="button-row">
+      <a class="btn btn-primary" href="3d.html">&#127918; Enter the 3D model</a>
+      <a class="btn" href="floorplan.html">&#128506; View floor plan</a>
+      <a class="btn" href="snapshots.html">&#128247; Browse snapshots</a>
+    </div>
+  </section>
+
+  <h2 class="section-title">The 3D captures</h2>
+  <div class="card-grid" id="model-cards"></div>
+
+  <h2 class="section-title">Floor plan</h2>
+  <div class="card-grid" id="floorplan-cards"></div>
+
+  <h2 class="section-title">Site snapshots</h2>
+  <div class="card-grid" id="snapshot-cards"></div>
+
+  <h2 class="section-title">At a glance</h2>
+  <div class="card-grid">
+    <div class="card"><div class="body">
+      <h3>Rooms captured</h3>
+      <p class="meta" id="stat-models">&mdash;</p>
+    </div></div>
+    <div class="card"><div class="body">
+      <h3>Total walkable floor</h3>
+      <p class="meta" id="stat-area">&mdash;</p>
+    </div></div>
+    <div class="card"><div class="body">
+      <h3>Photos</h3>
+      <p class="meta" id="stat-photos">&mdash;</p>
+    </div></div>
+    <div class="card"><div class="body">
+      <h3>Download size</h3>
+      <p class="meta" id="stat-size">&mdash;</p>
+    </div></div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="inner">
+    <span>&copy; <span data-year>2026</span> New Lab Block &middot; shared with the lab</span>
+    <span>Built with Three.js &middot; hosted on GitHub Pages</span>
+  </div>
+</footer>
+
+<script type="module">
+import { requireAuth, initLockButton } from './assets/js/auth.js';
+await requireAuth();
+initLockButton();
+import { loadManifest, formatBytes, formatMetres, initLightbox, initFooter } from './assets/js/common.js';
+
+initFooter();
+
+const manifest = await loadManifest();
+
+// ---- 3D model cards -------------------------------------------------------
+const modelCards = document.getElementById('model-cards');
+for (const model of manifest.models) {
+  const size = model.roomSize || model.bounds?.size || [];
+  const el = document.createElement('a');
+  el.className = 'card';
+  el.href = `3d.html?model=${encodeURIComponent(model.id)}`;
+  el.innerHTML = `
+    <div class="thumb" style="display:flex;align-items:center;justify-content:center;
+         background:linear-gradient(135deg,#12202c,#0d141c)">
+      <span style="font-size:2.4rem">&#127960;</span>
+    </div>
+    <div class="body">
+      <h3>${model.title}</h3>
+      <div class="meta">
+        <span>${formatMetres(size[0])} &times; ${formatMetres(size[2])}</span>
+        <span>${formatBytes(model.bytes)}</span>
+      </div>
+    </div>`;
+  modelCards.appendChild(el);
+}
+
+// ---- photo cards ----------------------------------------------------------
+function photoCard(item) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.lightbox = item.file;
+  el.dataset.title = item.title;
+  el.innerHTML = `
+    <div class="thumb"><img src="${item.thumb}" alt="${item.title}" loading="lazy"></div>
+    <div class="body">
+      <h3>${item.title}</h3>
+      <div class="meta">
+        <span>${item.width} &times; ${item.height}</span>
+        <span>${formatBytes(item.bytes)}</span>
+      </div>
+    </div>`;
+  return el;
+}
+
+const fpCards = document.getElementById('floorplan-cards');
+manifest.floorPlan.forEach((item) => fpCards.appendChild(photoCard(item)));
+
+const snapCards = document.getElementById('snapshot-cards');
+manifest.snapshots.forEach((item) => snapCards.appendChild(photoCard(item)));
+
+// ---- statistics ------------------------------------------------------------
+const area = manifest.models.reduce((sum, m) => sum + (m.floorArea || 0), 0);
+const photos = manifest.floorPlan.length + manifest.snapshots.length;
+const modelBytes = manifest.models.reduce((sum, m) => sum + m.bytes, 0);
+const photoBytes = [...manifest.floorPlan, ...manifest.snapshots]
+  .reduce((sum, i) => sum + i.bytes, 0);
+
+document.getElementById('stat-models').textContent =
+  `${manifest.models.length} rooms - ${manifest.models.map((m) => m.title).join(', ')}`;
+document.getElementById('stat-area').textContent = `${area.toFixed(1)} m2 captured`;
+document.getElementById('stat-photos').textContent =
+  `${photos} photos - ${formatBytes(photoBytes)}`;
+document.getElementById('stat-size').textContent =
+  `3D: ${formatBytes(modelBytes)}`;
+
+initLightbox('#floorplan-cards');
+initLightbox('#snapshot-cards');
+</script>
+
+</body>
+</html>

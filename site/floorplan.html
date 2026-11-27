@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Floor plan - New Lab Block</title>
+<meta name="description" content="Floor plans of the new lab building, 5th floor.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127959;</text></svg>">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="index.html"><span class="dot"></span> New Lab Block</a>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="3d.html">3D Models</a>
+      <a href="floorplan.html" class="active">Floor Plan</a>
+      <a href="snapshots.html">Snapshots</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Floor plan</h1>
+    <p>
+      Plans of the 5th floor as provided by the building office. Click a plan to
+      open it full size; use the arrow keys to page through the images.
+    </p>
+  </div>
+
+  <div class="card-grid" id="floorplan-cards"></div>
+
+  <p class="notice" style="margin-top:1.6rem">
+    <strong>Tip:</strong> the annotated plan has our labs marked on it &mdash; it is the
+    quickest way to see how the 3D captures relate to the building layout.
+  </p>
+</main>
+
+<footer class="site-footer">
+  <div class="inner">
+    <span>&copy; <span data-year>2026</span> New Lab Block &middot; shared with the lab</span>
+    <span>Built with Three.js &middot; hosted on GitHub Pages</span>
+  </div>
+</footer>
+
+<script type="module">
+import { requireAuth, initLockButton } from './assets/js/auth.js';
+await requireAuth();
+initLockButton();
+import { loadManifest, formatBytes, initLightbox, initFooter } from './assets/js/common.js';
+
+initFooter();
+const manifest = await loadManifest();
+const grid = document.getElementById('floorplan-cards');
+
+for (const item of manifest.floorPlan) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.lightbox = item.file;
+  el.dataset.title = item.title;
+  el.innerHTML = `
+    <div class="thumb"><img src="${item.thumb}" alt="${item.title}" loading="lazy"></div>
+    <div class="body">
+      <h3>${item.title}</h3>
+      <div class="meta">
+        <span>${item.width} &times; ${item.height} px</span>
+        <span>${formatBytes(item.bytes)}</span>
+      </div>
+    </div>`;
+  grid.appendChild(el);
+}
+
+initLightbox('#floorplan-cards');
+</script>
+
+</body>
+</html>

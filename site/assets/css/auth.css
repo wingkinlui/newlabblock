@@ -1,0 +1,111 @@
+/* ==========================================================================
+   Password gate styling.
+
+   The gate covers the page until the correct password has been entered.
+   ========================================================================== */
+
+html.is-locked body > *:not(.gate) {
+  visibility: hidden;
+}
+
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(900px 500px at 20% 0%, rgba(56, 189, 248, .12), transparent 60%),
+    radial-gradient(700px 400px at 85% 10%, rgba(251, 191, 36, .08), transparent 55%),
+    #0b0f14;
+}
+
+.gate-card {
+  width: min(380px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 2rem 1.75rem 1.6rem;
+  text-align: center;
+  box-shadow: var(--shadow);
+  animation: gate-in .22s ease-out;
+}
+
+@keyframes gate-in {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+.gate-lock {
+  font-size: 2rem;
+  margin-bottom: .5rem;
+}
+
+.gate-card h1 {
+  margin: 0 0 .35rem;
+  font-size: 1.45rem;
+  letter-spacing: -.02em;
+}
+
+.gate-sub {
+  color: var(--muted);
+  font-size: .92rem;
+  margin: 0 0 1.4rem;
+}
+
+.gate-card input {
+  width: 100%;
+  padding: .72rem .9rem;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 1rem;
+  text-align: center;
+  letter-spacing: .12em;
+  margin-bottom: .8rem;
+}
+
+.gate-card input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .16);
+}
+
+.gate-submit {
+  width: 100%;
+  justify-content: center;
+}
+
+.gate-error {
+  color: #f87171;
+  font-size: .88rem;
+  margin: .85rem 0 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.site-nav .lock-btn {
+  color: var(--muted);
+  padding: .4rem .78rem;
+  border-radius: 9px;
+  font-size: .93rem;
+  font-weight: 500;
+  margin-left: .3rem;
+  border: 1px solid var(--line);
+}
+.site-nav .lock-btn:hover {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+  text-decoration: none;
+}

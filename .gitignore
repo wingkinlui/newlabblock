@@ -1,0 +1,14 @@
+# Build artefacts and local tooling - not part of the published site.
+node_modules/
+work/
+
+# Raw source assets: the original camera photos and PolyCam captures are far
+# too large for a repository and are kept outside the published site.
+FloorPlan/
+SnapShots/
+3DSpace/
+
+# OS noise
+.DS_Store
+Thumbs.db
+

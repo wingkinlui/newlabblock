@@ -1,0 +1,269 @@
+{
+  "floorPlan": [
+    {
+      "id": "5F_FloorPlan",
+      "title": "5th Floor Plan",
+      "file": "assets/img/5F_FloorPlan.jpg",
+      "thumb": "assets/img/thumbs/5F_FloorPlan.jpg",
+      "width": 2560,
+      "height": 1655,
+      "bytes": 610151,
+      "originalBytes": 2956120,
+      "originalName": "5F_FloorPlan.jpeg"
+    },
+    {
+      "id": "5F_FloorPlan_Overlaid",
+      "title": "5th Floor Plan (annotated)",
+      "file": "assets/img/5F_FloorPlan_Overlaid.jpg",
+      "thumb": "assets/img/thumbs/5F_FloorPlan_Overlaid.jpg",
+      "width": 2560,
+      "height": 1678,
+      "bytes": 431346,
+      "originalBytes": 2130443,
+      "originalName": "5F_FloorPlan_Overlaid.jpeg"
+    }
+  ],
+  "snapshots": [
+    {
+      "id": "Building",
+      "title": "New Building - Exterior",
+      "file": "assets/img/Building.jpg",
+      "thumb": "assets/img/thumbs/Building.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 748689,
+      "originalBytes": 5007744,
+      "originalName": "Building.jpeg"
+    },
+    {
+      "id": "Corridor",
+      "title": "Main Corridor",
+      "file": "assets/img/Corridor.jpg",
+      "thumb": "assets/img/thumbs/Corridor.jpg",
+      "width": 1920,
+      "height": 2560,
+      "bytes": 269255,
+      "originalBytes": 2596699,
+      "originalName": "Corridor.jpeg"
+    },
+    {
+      "id": "F_Toilet",
+      "title": "Ground Floor Toilet",
+      "file": "assets/img/F_Toilet.jpg",
+      "thumb": "assets/img/thumbs/F_Toilet.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 425979,
+      "originalBytes": 4054752,
+      "originalName": "F_Toilet.jpeg"
+    },
+    {
+      "id": "Greenhouse",
+      "title": "Greenhouse",
+      "file": "assets/img/Greenhouse.jpg",
+      "thumb": "assets/img/thumbs/Greenhouse.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 836132,
+      "originalBytes": 5462016,
+      "originalName": "Greenhouse.jpeg"
+    },
+    {
+      "id": "Greenhouse_2",
+      "title": "Greenhouse (view 2)",
+      "file": "assets/img/Greenhouse_2.jpg",
+      "thumb": "assets/img/thumbs/Greenhouse_2.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 877081,
+      "originalBytes": 5665725,
+      "originalName": "Greenhouse_2.jpeg"
+    },
+    {
+      "id": "M_Toilet",
+      "title": "2nd Floor Toilet",
+      "file": "assets/img/M_Toilet.jpg",
+      "thumb": "assets/img/thumbs/M_Toilet.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 481954,
+      "originalBytes": 4321633,
+      "originalName": "M_Toilet.jpeg"
+    },
+    {
+      "id": "M_Toilet_2",
+      "title": "2nd Floor Toilet (view 2)",
+      "file": "assets/img/M_Toilet_2.jpg",
+      "thumb": "assets/img/thumbs/M_Toilet_2.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 410299,
+      "originalBytes": 4320888,
+      "originalName": "M_Toilet_2.jpeg"
+    },
+    {
+      "id": "Stairs",
+      "title": "Stairwell",
+      "file": "assets/img/Stairs.jpg",
+      "thumb": "assets/img/thumbs/Stairs.jpg",
+      "width": 1920,
+      "height": 2560,
+      "bytes": 272876,
+      "originalBytes": 3546854,
+      "originalName": "Stairs.jpeg"
+    },
+    {
+      "id": "Stairs_1F",
+      "title": "Stairwell - Ground Floor",
+      "file": "assets/img/Stairs_1F.jpg",
+      "thumb": "assets/img/thumbs/Stairs_1F.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 542003,
+      "originalBytes": 4645307,
+      "originalName": "Stairs_1F.jpeg"
+    },
+    {
+      "id": "TypeC_Lab",
+      "title": "Type C Laboratory",
+      "file": "assets/img/TypeC_Lab.jpg",
+      "thumb": "assets/img/thumbs/TypeC_Lab.jpg",
+      "width": 2560,
+      "height": 1920,
+      "bytes": 506264,
+      "originalBytes": 4635548,
+      "originalName": "TypeC_Lab.jpeg"
+    }
+  ],
+  "models": [
+    {
+      "id": "openlab",
+      "title": "Open Lab",
+      "subtitle": "Long open-plan laboratory - PolyCam capture, 27 Nov 2026",
+      "file": "assets/models/openlab.glb",
+      "sourceName": "27_11_2026.glb",
+      "bytes": 2588344,
+      "triangles": 343757,
+      "bounds": {
+        "min": [
+          -5.2421,
+          -1.7329,
+          -9.9238
+        ],
+        "max": [
+          5.4696,
+          2.2676,
+          12.7573
+        ],
+        "size": [
+          10.7117,
+          4.0005,
+          22.6811
+        ]
+      },
+      "textureBytes": 2100386,
+      "geometryBytes": 482749,
+      "collision": "assets/collision/openlab.collision.json",
+      "floorY": -1.4,
+      "ceilingY": 1.25,
+      "spawn": [
+        -2.756,
+        0.2,
+        3.506
+      ],
+      "heading": 90.0,
+      "floorArea": 80.3,
+      "roomSize": [
+        10.6905,
+        3.9769,
+        22.6598
+      ]
+    },
+    {
+      "id": "typeclab",
+      "title": "Type C Lab",
+      "subtitle": "Type C laboratory - PolyCam capture",
+      "file": "assets/models/typeclab.glb",
+      "sourceName": "TypeCLab.glb",
+      "bytes": 900624,
+      "triangles": 249824,
+      "bounds": {
+        "min": [
+          -3.5982,
+          -1.4392,
+          -4.6151
+        ],
+        "max": [
+          4.6131,
+          2.1972,
+          6.7071
+        ],
+        "size": [
+          8.2113,
+          3.6364,
+          11.3223
+        ]
+      },
+      "textureBytes": 535503,
+      "geometryBytes": 362813,
+      "collision": "assets/collision/typeclab.collision.json",
+      "floorY": -1.4,
+      "ceilingY": 1.3,
+      "spawn": [
+        -1.983,
+        0.2,
+        2.453
+      ],
+      "heading": 270.0,
+      "floorArea": 31.8,
+      "roomSize": [
+        8.2018,
+        3.6278,
+        11.3112
+      ]
+    },
+    {
+      "id": "tfoffice",
+      "title": "TF Office",
+      "subtitle": "Supervisor's office - PolyCam capture",
+      "file": "assets/models/tfoffice.glb",
+      "sourceName": "TF OFFICE.glb",
+      "bytes": 430008,
+      "triangles": 57607,
+      "bounds": {
+        "min": [
+          -2.1472,
+          -1.5278,
+          -1.6256
+        ],
+        "max": [
+          3.707,
+          1.0293,
+          1.1915
+        ],
+        "size": [
+          5.8542,
+          2.5571,
+          2.8171
+        ]
+      },
+      "textureBytes": 341728,
+      "geometryBytes": 86945,
+      "collision": "assets/collision/tfoffice.collision.json",
+      "floorY": -1.5,
+      "ceilingY": 0.95,
+      "spawn": [
+        1.494,
+        0.1,
+        0.111
+      ],
+      "heading": 225.0,
+      "floorArea": 4.0,
+      "roomSize": [
+        5.8485,
+        2.5509,
+        2.8105
+      ]
+    }
+  ]
+}

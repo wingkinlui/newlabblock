@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snapshots - New Lab Block</title>
+<meta name="description" content="Photos taken during the site visit to the new lab building.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127959;</text></svg>">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="index.html"><span class="dot"></span> New Lab Block</a>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="3d.html">3D Models</a>
+      <a href="floorplan.html">Floor Plan</a>
+      <a href="snapshots.html" class="active">Snapshots</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Site snapshots</h1>
+    <p>
+      Photos taken around the building on the day of the visit. Click any photo
+      to open it full size; use the arrow keys to page through the set.
+    </p>
+  </div>
+
+  <div class="card-grid" id="snapshot-cards"></div>
+</main>
+
+<footer class="site-footer">
+  <div class="inner">
+    <span>&copy; <span data-year>2026</span> New Lab Block &middot; shared with the lab</span>
+    <span>Built with Three.js &middot; hosted on GitHub Pages</span>
+  </div>
+</footer>
+
+<script type="module">
+import { requireAuth, initLockButton } from './assets/js/auth.js';
+await requireAuth();
+initLockButton();
+import { loadManifest, formatBytes, initLightbox, initFooter } from './assets/js/common.js';
+
+initFooter();
+const manifest = await loadManifest();
+const grid = document.getElementById('snapshot-cards');
+
+for (const item of manifest.snapshots) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.lightbox = item.file;
+  el.dataset.title = item.title;
+  el.innerHTML = `
+    <div class="thumb"><img src="${item.thumb}" alt="${item.title}" loading="lazy"></div>
+    <div class="body">
+      <h3>${item.title}</h3>
+      <div class="meta">
+        <span>${item.width} &times; ${item.height} px</span>
+        <span>${formatBytes(item.bytes)}</span>
+      </div>
+    </div>`;
+  grid.appendChild(el);
+}
+
+initLightbox('#snapshot-cards');
+</script>
+
+</body>
+</html>
