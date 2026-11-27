@@ -65,8 +65,12 @@ const measureReadout = document.getElementById('measure-readout');
 
 const viewer = new LabViewer(canvas, {
   onStatus: (text) => { statusEl.textContent = text; },
-  onCameraMove: (position) => {
-    positionEl.textContent = `x ${position.x.toFixed(2)}  z ${position.z.toFixed(2)} m`;
+  onCameraMove: (position, yaw, flying) => {
+    // In flight mode the height is shown as well - it is the third dimension
+    // the camera can move in.
+    positionEl.textContent = flying
+      ? `x ${position.x.toFixed(2)}  y ${position.y.toFixed(2)}  z ${position.z.toFixed(2)} m`
+      : `x ${position.x.toFixed(2)}  z ${position.z.toFixed(2)} m`;
     drawMinimap();
   },
   onMeasureUpdate: ({ segments, total, points }) => {
@@ -183,9 +187,11 @@ document.getElementById('measure-clear').addEventListener('click', () => {
   viewer.clearMeasurement();
 });
 
-// Clip / solid objects toggle.
+// Clip / solid objects + flight toggles.
 const clipToggle = document.getElementById('clip-toggle');
 const clipState = document.getElementById('clip-state');
+const flightToggle = document.getElementById('flight-toggle');
+const flightState = document.getElementById('flight-state');
 
 function renderClipState() {
   const solid = viewer.solidObjects;
@@ -194,10 +200,20 @@ function renderClipState() {
   clipState.textContent = solid
     ? 'Solid objects (furniture blocks)'
     : 'Clipping through objects';
+
+  const flying = viewer.flightMode;
+  flightToggle.setAttribute('aria-pressed', String(flying));
+  flightToggle.classList.toggle('active', flying);
+  flightState.textContent = flying ? 'Flying (F) - through everything' : 'Fly (F)';
 }
 
 clipToggle.addEventListener('click', () => {
   viewer.toggleSolidObjects();
+  renderClipState();
+});
+
+flightToggle.addEventListener('click', () => {
+  viewer.toggleFlight();
   renderClipState();
 });
 
@@ -211,7 +227,7 @@ window.addEventListener('keydown', (e) => {
     viewer.toggleMeasure();
     measurePanel.hidden = true;
   }
-  if (e.code === 'KeyC') renderClipState();
+  if (e.code === 'KeyC' || e.code === 'KeyF') renderClipState();
 });
 
 /* --------------------------------------------------------------- start up */

@@ -18,7 +18,7 @@
    they are cached afterwards so that a second visit works offline.
    ========================================================================== */
 
-const CACHE = 'nlb-site-v4';
+const CACHE = 'nlb-site-v5';
 
 const SHELL = [
   './',

@@ -29,6 +29,10 @@ The site is password protected and published with GitHub Pages.
   the pointer for a proper first-person feel (`Esc` releases it again).
 * **Measure** — press `M`, then click points on the model. Each segment and
   the total are shown in metres. Press `Esc` or `M` again to leave measure mode.
+* **Fly** — press `F` (or use the *Fly* button) to switch to a free-flying
+  drone camera that passes through everything, walls included. Use `Space`
+  and `Q` to go up and down; `W` follows the direction you are looking in, so
+  looking up moves you up. Press `F` again to go back to walking.
 * **Clip / solid** — press `C` (or use the *Collision* button) to switch
   between walking through the furniture and being stopped by it.
 * **Reset** the view with `R`.
@@ -53,7 +57,7 @@ The grid distinguishes three kinds of cell:
 
 | Cell | Meaning | Blocks the camera? |
 | --- | --- | --- |
-| `1` | wall or the boundary of the captured space | always |
+| `1` | wall or the boundary of the captured space | always (except in flight mode) |
 | `2` | open floor | no |
 | `3` | furniture, benches, building materials | only in "solid objects" mode |
 
@@ -64,6 +68,22 @@ off even where the geometry is low.
 
 By default the camera **clips through objects** and only the walls stop it.
 Press `C` or click the *Collision* button to make the furniture solid again.
+
+### Flight mode
+
+Some of the captures are too incomplete to walk around in - there are gaps in
+the scan and parts of the lab that were not recorded at all. **Flight mode**
+(`F`) switches the camera into a free-flying drone:
+
+* it ignores the collision grid completely and passes through walls,
+  furniture and everything else,
+* it moves in three dimensions - `Space` and `Q` go up and down,
+* `W`/`S` follow the direction the camera is looking in, so tilting the view
+  up makes the camera climb,
+* the position readout shows the height as well,
+* switching back to walking puts the camera back on the floor of the room,
+  at the nearest walkable spot.
+
 
 
 ## Password protection
@@ -187,6 +207,7 @@ cd site
 node tools/test_site.mjs             # end-to-end: gate, pages, 3D viewer, measuring
 node tools/test_collision.mjs        # the camera never leaves the walkable floor
 node tools/test_clip_modes.mjs       # clipping and solid objects really differ
+node tools/test_flight.mjs            # the drone camera passes through everything
 node tools/test_visitor_journey.mjs  # a fresh visitor: encrypted files, unlock, browse
 node tools/test_returning_visitor.mjs # a returning visitor (service worker active)
 node tools/test_service_worker.mjs   # a new deployment reaches a returning visitor

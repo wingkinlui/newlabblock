@@ -126,6 +126,9 @@ export class LabViewer {
     this.collision = null;
     this.measureMode = false;
     this.solidObjects = false;   // clip through furniture by default
+    this.flightMode = false;     // free-flying drone camera
+    this.flying = null;          // position while flying
+    this.flightSpeed = 4.0;
     this.measurePoints = [];
     this.measureLines = [];
     this.measureLabels = [];
@@ -201,6 +204,7 @@ export class LabViewer {
       if (e.code === 'KeyM') this.toggleMeasure();
       if (e.code === 'KeyR') this.resetView();
       if (e.code === 'KeyC') this.toggleSolidObjects();
+      if (e.code === 'KeyF') this.toggleFlight();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
@@ -235,6 +239,81 @@ export class LabViewer {
       ? 'Solid objects on - furniture blocks the way'
       : 'Clipping through objects - only the walls stop you');
     return this.solidObjects;
+  }
+
+  /**
+   * Switch between walking on the floor and flying freely.
+   *
+   * In flight mode the camera ignores the collision grid completely: it can
+   * pass through walls, furniture and everything else, and it can also move
+   * up and down.  This is the "drone" mode - useful when the capture is too
+   * incomplete to walk around in.
+   */
+  toggleFlight() {
+    this.flightMode = !this.flightMode;
+    if (this.flightMode) {
+      // Start at eye height above the floor, wherever the camera is now.
+      if (!this.flying) {
+        this.flying = this.position.clone();
+        this.flying.y = this.floorY + EYE_HEIGHT;
+      }
+      this.position.copy(this.flying);
+      this.onStatus('Flight mode - the camera passes through everything '
+        + '(Space/Q to go up and down)');
+    } else {
+      // Back to walking: put the camera back on a walkable spot, otherwise
+      // it would be stuck wherever the flight took it.
+      this.flying = null;
+      this.returnToFloor();
+      this.onStatus('');
+    }
+    this.updateCamera();
+    return this.flightMode;
+  }
+
+  /**
+   * Put the camera back onto the walkable floor.
+   *
+   * After a flight the camera may be outside the room or above the
+   * furniture, so the nearest walkable cell is looked up and used as the new
+   * position.
+   */
+  returnToFloor() {
+    this.position.y = this.floorY + EYE_HEIGHT;
+
+    if (!this.collision || this.isWalkable(this.position.x, this.position.z)) {
+      return;
+    }
+
+    // Search outwards from the current cell for a walkable one.
+    const { cell, origin, width, height } = this.collision;
+    const gx = Math.floor((this.position.x - origin[0]) / cell);
+    const gz = Math.floor((this.position.z - origin[1]) / cell);
+
+    let best = null;
+    for (let radius = 1; radius <= 60 && !best; radius += 1) {
+      for (let dz = -radius; dz <= radius && !best; dz += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          // Only look at the ring that is currently being searched.
+          if (Math.max(Math.abs(dx), Math.abs(dz)) !== radius) continue;
+          const nx = gx + dx;
+          const nz = gz + dz;
+          if (nx < 0 || nx >= width || nz < 0 || nz >= height) continue;
+          const x = origin[0] + (nx + 0.5) * cell;
+          const z = origin[1] + (nz + 0.5) * cell;
+          if (this.isWalkable(x, z)) {
+            best = { x, z };
+            break;
+          }
+        }
+      }
+    }
+
+    if (best) {
+      this.position.x = best.x;
+      this.position.z = best.z;
+      this.onStatus('Back on the floor');
+    }
   }
 
   /* -------------------------------------------------------------- loading */
@@ -351,12 +430,19 @@ export class LabViewer {
     this.camera.rotation.set(0, 0, 0);
     this.camera.rotateY(this.yaw);
     this.camera.rotateX(this.pitch);
-    this.onCameraMove(this.position, this.yaw);
+    this.onCameraMove(this.position, this.yaw, this.flightMode);
   }
 
   /** Main animation loop step. */
   update() {
     const dt = Math.min(this.clock.getDelta(), 0.05);
+
+    if (this.flightMode) {
+      this.updateFlight(dt);
+      this.updateCamera();
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
 
     const forward = (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0)
       - (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
@@ -379,6 +465,41 @@ export class LabViewer {
     this.updateCamera();
     this.renderer.render(this.scene, this.camera);
   }
+
+  /**
+   * Movement in flight mode.
+   *
+   * The camera flies in the direction it looks (including upwards and
+   * downwards when looking up or down) and can be raised or lowered
+   * independently with the vertical keys.  Nothing blocks it.
+   */
+  updateFlight(dt) {
+    const forward = (this.keys.has('KeyW') || this.keys.has('ArrowUp') ? 1 : 0)
+      - (this.keys.has('KeyS') || this.keys.has('ArrowDown') ? 1 : 0);
+    const strafe = (this.keys.has('KeyD') || this.keys.has('ArrowRight') ? 1 : 0)
+      - (this.keys.has('KeyA') || this.keys.has('ArrowLeft') ? 1 : 0);
+    const up = (this.keys.has('Space') || this.keys.has('KeyE') ? 1 : 0)
+      - (this.keys.has('KeyQ') || this.keys.has('ControlLeft') ? 1 : 0);
+    const running = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+
+    if (!forward && !strafe && !up) return;
+
+    const speed = (running ? RUN_SPEED * 1.6 : this.flightSpeed) * dt;
+
+    // Forward follows the full camera orientation, so looking up moves up.
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(
+      new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'),
+    );
+    const right = new THREE.Vector3(1, 0, 0).applyEuler(
+      new THREE.Euler(0, this.yaw, 0, 'YXZ'),
+    );
+
+    this.position.addScaledVector(dir, forward * speed);
+    this.position.addScaledVector(right, strafe * speed);
+    this.position.y += up * speed;
+    this.flying = this.position.clone();
+  }
+
 
   start() {
     const loop = () => {
@@ -496,6 +617,9 @@ export class LabViewer {
     this.position.set(spawn[0], spawn[1], spawn[2]);
     this.yaw = headingToYaw(this.collision.heading);
     this.pitch = 0;
+    if (this.flightMode) {
+      this.flying = this.position.clone();
+    }
     this.updateCamera();
   }
 
