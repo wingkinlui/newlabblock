@@ -48,7 +48,7 @@
     },
     {
       "id": "F_Toilet",
-      "title": "Ground Floor Toilet",
+      "title": "Female Toilet",
       "file": "assets/img/F_Toilet.jpg",
       "thumb": "assets/img/thumbs/F_Toilet.jpg",
       "width": 2560,
@@ -81,7 +81,7 @@
     },
     {
       "id": "M_Toilet",
-      "title": "2nd Floor Toilet",
+      "title": "Male Toilet",
       "file": "assets/img/M_Toilet.jpg",
       "thumb": "assets/img/thumbs/M_Toilet.jpg",
       "width": 2560,
@@ -92,7 +92,7 @@
     },
     {
       "id": "M_Toilet_2",
-      "title": "2nd Floor Toilet (view 2)",
+      "title": "Male Toilet (view 2)",
       "file": "assets/img/M_Toilet_2.jpg",
       "thumb": "assets/img/thumbs/M_Toilet_2.jpg",
       "width": 2560,
