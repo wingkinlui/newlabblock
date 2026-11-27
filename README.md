@@ -29,6 +29,8 @@ The site is password protected and published with GitHub Pages.
   the pointer for a proper first-person feel (`Esc` releases it again).
 * **Measure** — press `M`, then click points on the model. Each segment and
   the total are shown in metres. Press `Esc` or `M` again to leave measure mode.
+* **Clip / solid** — press `C` (or use the *Collision* button) to switch
+  between walking through the furniture and being stopped by it.
 * **Reset** the view with `R`.
 * The minimap in the corner shows the walkable floor, your position and the
   direction you are facing.
@@ -42,10 +44,27 @@ open.
 
 ### Collision
 
-You cannot walk through walls or desks. This is driven by a walkability grid
-that is generated from the capture geometry at build time (see below): every
-cell of a 15 cm grid over the floor plan is marked as *void*, *blocked* or
-*walkable*.
+You cannot walk out of the room: the walls and the boundary of the scanned
+space always stop you. Everything *inside* the room is different — the lab is
+still being built, and benches, crates and building materials would otherwise
+block the way to half the benches.
+
+The grid distinguishes three kinds of cell:
+
+| Cell | Meaning | Blocks the camera? |
+| --- | --- | --- |
+| `1` | wall or the boundary of the captured space | always |
+| `2` | open floor | no |
+| `3` | furniture, benches, building materials | only in "solid objects" mode |
+
+The classification is derived from the capture geometry: a wall reaches up
+towards the ceiling, while a bench stops at bench height. Cells on the
+perimeter of the floor region are treated as boundary, so the room is closed
+off even where the geometry is low.
+
+By default the camera **clips through objects** and only the walls stop it.
+Press `C` or click the *Collision* button to make the furniture solid again.
+
 
 ## Password protection
 

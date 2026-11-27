@@ -3,21 +3,28 @@
 The viewer walks a first-person camera around the room.  To do that reliably
 we need to know, for every point on the floor plan:
 
-  * is there floor there at all?      (0 = void, outside the capture)
-  * is it blocked by a wall/furniture? (1 = blocked, 2 = walkable)
+  * is there floor there at all?        (0 = void, outside the capture)
+  * is it a wall or room boundary?       (1 = wall, always blocks)
+  * is it an obstacle in the room?       (3 = object, blocks only in
+                                                "solid objects" mode)
+  * is it open floor?                    (2 = walkable)
 
 Method
 ------
 Every triangle is sampled (vertices + edge midpoints + centroid) and the
-samples are scattered into an XZ grid.  A triangle is classified by its
-vertical span:
+samples are scattered into an XZ grid.  Per cell we record the vertical
+extent of the geometry, split into "floor level", "body band" (the height a
+person occupies) and "above the ceiling" (the ceiling itself, which must be
+ignored - otherwise every cell looks like a wall).
 
-  span >= 0.30 m              -> a wall or the side of a piece of furniture
-  span <  0.30 m and near the floor -> floor
-  span <  0.30 m and between floor+0.35 and floor+2.3 -> a table top / bench
+The classification is then:
 
-The output is a run-length encoded grid (small enough to inline in the
-manifest) plus the spawn point and the floor/ceiling heights.
+  * **walls**   - non-ceiling geometry that reaches high up (a partition or
+                  the outer wall), or cells at the perimeter of the floor
+                  region (the boundary of the scanned space),
+  * **objects** - geometry in the body band that is not a wall: benches,
+                  desks, building materials.  These are clipped through by
+                  default so that construction clutter cannot block the way.
 """
 
 import json
@@ -28,7 +35,7 @@ from pathlib import Path
 import numpy as np
 
 FLOAT, USHORT, UINT = 5126, 5123, 5125
-VOID, BLOCKED, WALKABLE = 0, 1, 2
+VOID, BLOCKED, WALKABLE, OBJECT = 0, 1, 2, 3
 
 
 def load_glb(path):
@@ -146,29 +153,77 @@ def analyse(path, cell=0.15):
     sy = samples[:, 1]
     inside = (sx >= 0) & (sx < nx) & (sz >= 0) & (sz < nz)
 
-    # A vertical ray through a cell tells us what is there:
-    #   - a hit at floor level          -> there is floor
-    #   - a hit in the "body band"      -> something to walk into
-    #     (walls, desks, benches, ...)
-    # The ceiling sits above the band, so it does not block movement.
+    # A vertical ray through a cell tells us what is there.  The ceiling has to
+    # be excluded, otherwise every cell looks like a wall.
     ix, iz, iy = sx[inside], sz[inside], sy[inside]
 
     body_lo = floor_y + 0.25
     body_hi = floor_y + 1.85
-    has_floor = np.zeros((nz, nx), dtype=bool)
-    has_body = np.zeros((nz, nx), dtype=bool)
-    has_ceil = np.zeros((nz, nx), dtype=bool)
 
-    np.logical_or.at(has_floor, (iz[np.abs(iy - floor_y) < 0.22], ix[np.abs(iy - floor_y) < 0.22]), True)
-    band = (iy > body_lo) & (iy < body_hi)
-    np.logical_or.at(has_body, (iz[band], ix[band]), True)
-    ceil = np.abs(iy - ceil_y) < 0.22
-    np.logical_or.at(has_ceil, (iz[ceil], ix[ceil]), True)
+    is_ceiling = np.abs(iy - ceil_y) < 0.30
+    body_y = iy[~is_ceiling]
+    body_ix = ix[~is_ceiling]
+    body_iz = iz[~is_ceiling]
 
-    grid[has_floor & ~has_body] = WALKABLE
-    grid[has_body] = BLOCKED
+    INF = np.float32(1e9)
+    # Lowest / highest geometry per cell (ceiling included).
+    ymin = np.full((nz, nx), INF, dtype=np.float32)
+    ymax = np.full((nz, nx), -INF, dtype=np.float32)
+    np.minimum.at(ymin, (iz, ix), iy.astype(np.float32))
+    np.maximum.at(ymax, (iz, ix), iy.astype(np.float32))
+
+    # Highest geometry that is not the ceiling: this is what tells a wall
+    # (reaches up to the ceiling) from a bench (stops at bench height).
+    top = np.full((nz, nx), -INF, dtype=np.float32)
+    np.maximum.at(top, (body_iz, body_ix), body_y.astype(np.float32))
+
+    has_geom = ymax > -INF
+    has_floor = has_geom & (np.abs(ymin - floor_y) < 0.22)
+    has_top = top > -INF
+
+    # Something in the band a person walks through.
+    in_body = np.zeros((nz, nx), dtype=bool)
+    band = (body_y > body_lo) & (body_y < body_hi)
+    np.logical_or.at(in_body, (body_iz[band], body_ix[band]), True)
+
+    # Height of the tallest non-ceiling geometry above the floor.
+    obh = np.where(has_top, top - floor_y, 0.0)
+
+    # --- walls ---------------------------------------------------------
+    # A wall reaches well above head height.  The threshold is relative to the
+    # room so that it also works for the smaller offices.
+    wall_height = min(2.0, 0.75 * (ceil_y - floor_y))
+    tall = has_top & (obh >= wall_height)
+
+    # The perimeter of the floor region is the boundary of the scanned space
+    # even where the geometry is not tall enough to be recognised as a wall.
+    # A cell counts as perimeter when it is within one cell of a cell that has
+    # no floor.
+    not_floor = ~has_floor
+    perimeter = np.zeros((nz, nx), dtype=bool)
+    for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        shifted = np.roll(not_floor, (dz, dx), axis=(0, 1))
+        perimeter |= shifted
+    perimeter &= has_floor
+
+    wall = has_floor & (tall | perimeter)
+
+    # --- objects -------------------------------------------------------
+    object_cell = has_floor & in_body & ~wall
+
+    grid = np.zeros((nz, nx), dtype=np.uint8)
+    grid[has_floor & ~in_body] = WALKABLE
+    grid[object_cell] = OBJECT
+    grid[wall] = BLOCKED
+
     print(f"  samples inside grid: {int(inside.sum())}  "
-          f"floor cells={int(has_floor.sum())} body cells={int(has_body.sum())}")
+          f"floor cells={int(has_floor.sum())}")
+    print(f"  wall threshold: {wall_height:.2f} m   "
+          f"walls={int(wall.sum())} (tall {int((has_floor & tall).sum())}, "
+          f"perimeter {int((has_floor & perimeter).sum())})   "
+          f"objects={int(object_cell.sum())}   "
+          f"open={int((grid == WALKABLE).sum())}")
+
 
     # Fill single-cell holes inside walkable areas (sampling noise).
     for _ in range(2):
@@ -180,12 +235,15 @@ def analyse(path, cell=0.15):
 
     n_walk = int((grid == WALKABLE).sum())
     n_block = int((grid == BLOCKED).sum())
+    n_obj = int((grid == OBJECT).sum())
     print(f"  walkable {n_walk} cells ({n_walk * cell * cell:.1f} m2), "
-          f"blocked {n_block} cells ({n_block * cell * cell:.1f} m2)")
+          f"walls {n_block} cells ({n_block * cell * cell:.1f} m2), "
+          f"objects {n_obj} cells ({n_obj * cell * cell:.1f} m2)")
 
     # --- spawn point ----------------------------------------------------
-    # Prefer a spot far from any blocked cell (so the camera is not jammed
-    # against a wall) but also reasonably central in the room.
+    # Prefer a spot far from any wall (so the camera is not jammed against
+    # one) and reasonably central.  Objects are ignored here: they are
+    # clipped through anyway.
     walk_idx = np.argwhere(grid == WALKABLE)
     if len(walk_idx):
         blocked_idx = np.argwhere(grid == BLOCKED)
@@ -206,7 +264,8 @@ def analyse(path, cell=0.15):
         print(f"  => SPAWN x={sx:.2f} z={sz:.2f} "
               f"(clearance {d * cell:.2f} m)")
 
-        # Heading with the longest clear straight run.
+        # Heading with the longest clear straight run.  Only walls stop the
+        # ray - objects can be walked through.
         best_dir, best_len = 0.0, -1.0
         for deg in range(0, 360, 15):
             dx, dz = np.cos(np.radians(deg)), np.sin(np.radians(deg))
@@ -216,7 +275,7 @@ def analyse(path, cell=0.15):
                 gz = int((sz + dz * step * cell - min_z) / cell)
                 if gx < 0 or gx >= nx or gz < 0 or gz >= nz:
                     break
-                if grid[gz, gx] != WALKABLE:
+                if grid[gz, gx] == BLOCKED:
                     break
                 length = step * cell
             if length > best_len:
@@ -249,6 +308,7 @@ def analyse(path, cell=0.15):
         "heading": round(float(best_dir), 1),
         "walkable": n_walk,
         "blocked": n_block,
+        "objects": n_obj,
         "rle": encoded,
     }
     out_path = Path(path).with_suffix(".collision.json")
@@ -256,9 +316,9 @@ def analyse(path, cell=0.15):
     print(f"  wrote {out_path.name} ({out_path.stat().st_size / 1024:.0f} KB)")
 
     # ASCII preview.
-    print("  grid preview (W walkable, # blocked, . void):")
+    print("  grid preview (W walkable, # wall, o object, . void):")
     for row in range(nz - 1, -1, -1):
-        line = "".join({WALKABLE: "W", BLOCKED: "#", VOID: "."}[v]
+        line = "".join({WALKABLE: "W", BLOCKED: "#", OBJECT: "o", VOID: "."}[v]
                         for v in grid[row].tolist())
         if row % 2 == 0:
             print(f"    z={min_z + row * cell:7.2f} {line}")

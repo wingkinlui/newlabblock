@@ -44,9 +44,17 @@
           <span><kbd>Shift</kbd> run</span>
           <span><kbd>Mouse</kbd> / <kbd>drag</kbd> look</span>
           <span><kbd>M</kbd> measure</span>
+          <span><kbd>C</kbd> clip / solid</span>
           <span><kbd>R</kbd> reset view</span>
           <span><kbd>Esc</kbd> release mouse</span>
         </div>
+      </div>
+
+      <div class="hud-panel clip-panel">
+        <div class="hud-label">Collision</div>
+        <button class="clip-btn" id="clip-toggle" aria-pressed="false">
+          <span class="clip-state" id="clip-state">Clipping through objects</span>
+        </button>
       </div>
 
       <div class="hud-panel measure-panel" id="measure-panel" hidden>

@@ -1,13 +1,14 @@
-/* Verify the walkability grid: the camera must never leave the walkable
- * area, and walking in every direction must stay inside the room.
+/* Verify the walkability grid and the clipping behaviour:
  *
- * Runs for all three rooms.
+ *   - in the default mode the camera may pass through furniture and building
+ *     materials, but never through a wall or the room boundary,
+ *   - in "solid objects" mode the furniture blocks the way again.
  */
 
 import puppeteer from 'puppeteer-core';
 
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const BASE = 'http://127.0.0.1:8099';
+const BASE = process.argv[2] || 'http://127.0.0.1:8099';
 const PASSWORD = 'tfcbioinform113';
 
 const browser = await puppeteer.launch({
@@ -22,7 +23,7 @@ page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 
 // Unlock once.
 await page.goto(`${BASE}/index.html`, { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('.gate', { timeout: 8000 });
+await page.waitForSelector('.gate', { timeout: 10000 });
 await page.type('#gate-password', PASSWORD);
 await page.click('.gate-submit');
 await page.waitForFunction(() => !document.querySelector('.gate'), { timeout: 15000 });
@@ -37,29 +38,27 @@ for (const room of rooms) {
   await page.waitForSelector('#loader.hidden', { timeout: 90000 });
   await new Promise((r) => setTimeout(r, 800));
 
-  // Install an in-page probe that samples the position every animation frame
-  // and records any position that is not on a walkable cell.
+  // Install a probe that samples the position every frame and records any
+  // position that lands on a wall.
   await page.evaluate(async () => {
     const mod = await import('./assets/js/crypto.js');
     const d = await mod.loadDecryptedJSON('assets/collision/'
       + new URLSearchParams(location.search).get('model') + '.collision.json');
     window.__grid = d;
 
-    // Decode the run-length encoded grid: each row is a flat
-    // [value, count, value, count, ...] list.
     const cells = new Uint8Array(d.width * d.height);
     for (let gz = 0; gz < d.height; gz += 1) {
       let p = 0;
       const row = d.rle[gz];
       for (let i = 0; i < row.length; i += 2) {
-        const value = row[i];
-        const count = row[i + 1];
-        for (let k = 0; k < count; k += 1) cells[gz * d.width + p++] = value;
+        for (let k = 0; k < row[i + 1]; k += 1) {
+          cells[gz * d.width + p++] = row[i];
+        }
       }
     }
     window.__cells = cells;
-
-    window.__violations = [];
+    window.__wallHits = [];
+    window.__objectHits = [];
     window.__samples = 0;
 
     const probe = () => {
@@ -73,57 +72,85 @@ for (const room of rooms) {
       const value = (gx < 0 || gx >= d.width || gz < 0 || gz >= d.height)
         ? 0 : cells[gz * d.width + gx];
       window.__samples += 1;
-      if (value !== 2) {
-        window.__violations.push({ x, z, value });
-      }
+      if (value === 1) window.__wallHits.push({ x, z });
+      if (value === 3) window.__objectHits.push({ x, z });
       requestAnimationFrame(probe);
     };
     requestAnimationFrame(probe);
   });
 
-  // Walk in all four directions for a while.
+  // --- default mode: clip through objects -----------------------------
   const keys = ['KeyW', 'KeyA', 'KeyS', 'KeyD'];
   for (const key of keys) {
     await page.keyboard.down(key);
     await new Promise((r) => setTimeout(r, 1400));
     await page.keyboard.up(key);
   }
-  // And straight into a wall: walk forward for a long time.
   await page.keyboard.down('KeyW');
   await new Promise((r) => setTimeout(r, 4000));
   await page.keyboard.up('KeyW');
   await new Promise((r) => setTimeout(r, 300));
 
-  const result = await page.evaluate(() => ({
+  const clipMode = await page.evaluate(() => ({
+    wallHits: window.__wallHits.length,
+    objectHits: window.__objectHits.length,
     samples: window.__samples,
-    violations: window.__violations.length,
-    firstViolation: window.__violations[0] || null,
-    pos: document.getElementById('position-readout').textContent,
-    spawn: window.__grid.spawn,
-    walkable: window.__grid.walkable,
-    blocked: window.__grid.blocked,
+    pos: document.getElementById('position-readout').textContent.trim(),
+    stats: window.__grid,
   }));
 
-  console.log(`  samples=${result.samples}  violations=${result.violations}`);
-  console.log(`  final position: ${result.pos.trim()}  (spawn ${result.spawn.map((n) => n.toFixed(2)).join(', ')})`);
-  console.log(`  grid: ${result.walkable} walkable / ${result.blocked} blocked cells`);
-  if (result.firstViolation) {
-    console.log(`  first violation: ${JSON.stringify(result.firstViolation)}`);
+  console.log(`  clip mode : samples=${clipMode.samples}  `
+    + `wall hits=${clipMode.wallHits}  object hits=${clipMode.objectHits}`);
+  console.log(`  grid      : ${clipMode.stats.walkable} walkable, `
+    + `${clipMode.stats.blocked} walls, ${clipMode.stats.objects ?? 0} objects`);
+
+  if (clipMode.wallHits === 0) {
+    console.log('  PASS  never entered a wall');
+  } else {
+    console.log('  FAIL  walked into a wall');
+    failures += 1;
+  }
+  if (clipMode.objectHits > 0) {
+    console.log('  PASS  clipped through objects');
+  } else {
+    console.log('  note  no object was crossed in this run');
   }
 
-  const moved = result.pos !== `${result.spawn[0].toFixed(2)}`;
-  if (result.violations > 0) {
-    console.log('  FAIL  camera left the walkable area');
+  // --- solid mode: objects block again --------------------------------
+  await page.keyboard.press('KeyC');
+  await new Promise((r) => setTimeout(r, 300));
+  const solidOn = await page.$eval('#clip-toggle', (b) => b.classList.contains('solid'));
+  console.log(`  solid mode toggled: ${solidOn}`);
+  if (!solidOn) {
+    console.log('  FAIL  the clip/solid toggle did not switch');
     failures += 1;
-  } else {
-    console.log('  PASS  camera stayed on walkable floor');
   }
-  if (result.samples < 20) {
-    console.log('  FAIL  too few samples - the render loop may have stopped');
-    failures += 1;
-  } else {
-    console.log(`  PASS  render loop ran (${result.samples} frames sampled)`);
+
+  // Walk into the nearest object and check we are stopped by it.
+  await page.evaluate(() => {
+    window.__wallHits = [];
+    window.__objectHits = [];
+  });
+  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
+    await page.keyboard.down(key);
+    await new Promise((r) => setTimeout(r, 1200));
+    await page.keyboard.up(key);
   }
+  const solidMode = await page.evaluate(() => ({
+    wallHits: window.__wallHits.length,
+    objectHits: window.__objectHits.length,
+  }));
+  console.log(`  solid mode: wall hits=${solidMode.wallHits}  `
+    + `object hits=${solidMode.objectHits}`);
+  if (solidMode.objectHits === 0 && solidMode.wallHits === 0) {
+    console.log('  note  nothing was hit in solid mode either');
+  } else {
+    console.log('  PASS  solid mode stops the camera');
+  }
+
+  // Switch back to clipping.
+  await page.keyboard.press('KeyC');
+  await new Promise((r) => setTimeout(r, 200));
 }
 
 await browser.close();

@@ -29,8 +29,10 @@ const RADIUS = 0.40;          // player collision radius in metres
 
 // Cell values of the walkability grid produced by tools/build_collision.py.
 const VOID = 0;               // no geometry - outside the capture
-const BLOCKED = 1;            // wall, desk or other obstacle
+const BLOCKED = 1;            // wall or room boundary - always blocks
 const WALKABLE = 2;           // open floor
+const OBJECT = 3;             // furniture / building materials - passable
+                           // unless "solid objects" mode is switched on
 
 /* --------------------------------------------------------------- helpers */
 
@@ -123,6 +125,7 @@ export class LabViewer {
     this.floorY = 0;
     this.collision = null;
     this.measureMode = false;
+    this.solidObjects = false;   // clip through furniture by default
     this.measurePoints = [];
     this.measureLines = [];
     this.measureLabels = [];
@@ -197,6 +200,7 @@ export class LabViewer {
       }
       if (e.code === 'KeyM') this.toggleMeasure();
       if (e.code === 'KeyR') this.resetView();
+      if (e.code === 'KeyC') this.toggleSolidObjects();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
@@ -217,6 +221,20 @@ export class LabViewer {
       this.onStatus('');
     }
     return this.measureMode;
+  }
+
+  /**
+   * Switch between clipping through objects and walking around them.
+   *
+   * The room boundary always blocks; only the furniture and the building
+   * materials are affected.
+   */
+  toggleSolidObjects() {
+    this.solidObjects = !this.solidObjects;
+    this.onStatus(this.solidObjects
+      ? 'Solid objects on - furniture blocks the way'
+      : 'Clipping through objects - only the walls stop you');
+    return this.solidObjects;
   }
 
   /* -------------------------------------------------------------- loading */
@@ -281,7 +299,13 @@ export class LabViewer {
     const gx = Math.floor((x - origin[0]) / cell);
     const gz = Math.floor((z - origin[1]) / cell);
     if (gx < 0 || gx >= width || gz < 0 || gz >= height) return false;
-    return cells[gz * width + gx] === WALKABLE;
+
+    const value = cells[gz * width + gx];
+    if (value === WALKABLE) return true;
+    // Furniture and building materials only block when the visitor asks for
+    // solid objects; the room boundary always blocks.
+    if (value === OBJECT) return !this.solidObjects;
+    return false;
   }
 
   /**

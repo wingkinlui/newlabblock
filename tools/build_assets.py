@@ -75,7 +75,12 @@ GLB_MAGIC = 0x46546C67
 
 
 def parse_glb(path: Path):
-    """Return (gltf_json, image_bytes, geometry_bytes) for a .glb on disk."""
+    """Return (gltf_json, image_bytes, geometry_bytes) for a .glb on disk.
+
+    The published models are stored encrypted, so this may not be able to
+    read them.  In that case the caller falls back to the values recorded in
+    the manifest from the previous build.
+    """
     data = path.read_bytes()
     magic, version, length = struct.unpack_from("<III", data, 0)
     if magic != GLB_MAGIC:
@@ -202,6 +207,17 @@ def main():
         "models": [],
     }
 
+    # Keep the figures from the previous build: the published models are
+    # encrypted, so their metadata cannot be read back.
+    previous_models = {}
+    manifest_path = SITE / "assets" / "manifest.json"
+    if manifest_path.exists():
+        try:
+            old = json.loads(manifest_path.read_text(encoding="utf-8"))
+            previous_models = {m["id"]: m for m in old.get("models", [])}
+        except (json.JSONDecodeError, KeyError):
+            previous_models = {}
+
     for entry in MODELS:
         src = ROOT / entry["source"]
         slug = entry["slug"]
@@ -214,10 +230,6 @@ def main():
                   file=sys.stderr)
             continue
 
-        gltf, image_bytes, geometry_bytes = parse_glb(dst)
-        bounds = model_bounds(gltf)
-        tris = triangle_count(gltf)
-
         item = {
             "id": slug,
             "title": entry["title"],
@@ -225,16 +237,45 @@ def main():
             "file": f"assets/models/{slug}.glb",
             "sourceName": src.name,
             "bytes": dst.stat().st_size,
-            "triangles": tris,
-            "bounds": bounds,
-            "textureBytes": image_bytes,
-            "geometryBytes": geometry_bytes,
+            "triangles": 0,
+            "bounds": None,
+            "textureBytes": 0,
+            "geometryBytes": 0,
         }
+
+        gltf = None
+        image_bytes = geometry_bytes = 0
+        try:
+            gltf, image_bytes, geometry_bytes = parse_glb(dst)
+        except ValueError:
+            # The published model is encrypted; fall back to the numbers
+            # recorded when it was built.
+            previous = previous_models.get(slug)
+            if previous:
+                item["bytes"] = previous["bytes"]
+                item["triangles"] = previous["triangles"]
+                item["bounds"] = previous["bounds"]
+                item["textureBytes"] = previous.get("textureBytes", 0)
+                item["geometryBytes"] = previous.get("geometryBytes", 0)
+            print(f"  note: {slug} is encrypted - kept the previous figures")
+        else:
+            item["bytes"] = dst.stat().st_size
+            item["triangles"] = triangle_count(gltf)
+            item["bounds"] = model_bounds(gltf)
+            item["textureBytes"] = image_bytes
+            item["geometryBytes"] = geometry_bytes
 
         # Merge the walkability data produced by build_models.py.
         collision_file = COLLISION_DIR / f"{slug}.collision.json"
+        collision = None
         if collision_file.exists():
-            collision = json.loads(collision_file.read_text(encoding="utf-8"))
+            try:
+                collision = json.loads(collision_file.read_text(encoding="utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                # The published grid is encrypted.
+                collision = None
+
+        if collision is not None:
             item["collision"] = f"assets/collision/{slug}.collision.json"
             item["floorY"] = collision["floorY"]
             item["ceilingY"] = collision["ceilingY"]
@@ -243,12 +284,23 @@ def main():
             item["floorArea"] = round(
                 collision["walkable"] * collision["cell"] ** 2, 1)
             item["roomSize"] = collision["bounds"]["size"]
+            item["objectArea"] = round(
+                collision.get("objects", 0) * collision["cell"] ** 2, 1)
         else:
-            print(f"! no collision data for {slug}", file=sys.stderr)
+            # Fall back to the figures recorded in the previous manifest.
+            previous = previous_models.get(slug, {})
+            for key in ("collision", "floorY", "ceilingY", "spawn", "heading",
+                        "floorArea", "roomSize", "objectArea"):
+                if key in previous:
+                    item[key] = previous[key]
+            print(f"  note: {slug} collision grid is encrypted - "
+                  f"kept the previous figures")
 
         manifest["models"].append(item)
-        print(f"model {slug}: {tris:,} tris, {bounds['size']} m, "
-              f"{dst.stat().st_size / 1e6:.2f} MB")
+        bounds = item.get("bounds") or {}
+        print(f"model {slug}: {item['triangles']:,} tris, "
+              f"{bounds.get('size', '-')} m, "
+              f"{item['bytes'] / 1e6:.2f} MB")
 
     manifest_path = SITE / "assets" / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

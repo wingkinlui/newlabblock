@@ -40,6 +40,7 @@ function renderInfo(model) {
   const rows = [
     ['Room size', `${formatMetres(size[0])} &times; ${formatMetres(size[2])}`],
     ['Walkable area', model.floorArea ? `${model.floorArea} m&sup2;` : '-'],
+    ['Clippable objects', model.objectArea ? `${model.objectArea} m&sup2;` : '-'],
     ['Ceiling height', model.ceilingY != null
       ? formatMetres(model.ceilingY - model.floorY) : '-'],
     ['Triangles', model.triangles ? model.triangles.toLocaleString() : '-'],
@@ -104,7 +105,10 @@ function drawMinimap() {
     for (let gx = 0; gx < width; gx += 1) {
       const v = cells[gz * width + gx];
       if (v === 0) continue;
-      mctx.fillStyle = v === 1 ? '#31404f' : '#1f6f8b';
+      // 1 = wall, 2 = open floor, 3 = object.
+      if (v === 1) mctx.fillStyle = '#3a4a5e';
+      else if (v === 2) mctx.fillStyle = '#1f6f8b';
+      else mctx.fillStyle = viewer.solidObjects ? '#7c5c1e' : '#2a3a48';
       mctx.fillRect(offX + gx * scale,
         offY + (height - 1 - gz) * scale, scale, scale);
     }
@@ -178,6 +182,24 @@ document.getElementById('measure-clear').addEventListener('click', () => {
   viewer.clearMeasurement();
 });
 
+// Clip / solid objects toggle.
+const clipToggle = document.getElementById('clip-toggle');
+const clipState = document.getElementById('clip-state');
+
+function renderClipState() {
+  const solid = viewer.solidObjects;
+  clipToggle.setAttribute('aria-pressed', String(solid));
+  clipToggle.classList.toggle('solid', solid);
+  clipState.textContent = solid
+    ? 'Solid objects (furniture blocks)'
+    : 'Clipping through objects';
+}
+
+clipToggle.addEventListener('click', () => {
+  viewer.toggleSolidObjects();
+  renderClipState();
+});
+
 const infoPanel = document.getElementById('info-panel');
 document.getElementById('info-toggle').addEventListener('click', () => {
   infoPanel.classList.toggle('open');
@@ -188,11 +210,13 @@ window.addEventListener('keydown', (e) => {
     viewer.toggleMeasure();
     measurePanel.hidden = true;
   }
+  if (e.code === 'KeyC') renderClipState();
 });
 
 /* --------------------------------------------------------------- start up */
 
 markActive(current.id);
 renderInfo(current);
+renderClipState();
 await switchModel(current.id);
 viewer.start();
