@@ -6,6 +6,15 @@ rooms captured with PolyCam.
 
 The site is password protected and published with GitHub Pages.
 
+**Live site:** <https://wingkinlui.github.io/newlabblock/>
+
+> **Note on the repository being public.** GitHub's free plan does not support
+> Pages for private repositories, so the repository has to be public. The
+> *content* is still protected: the 3D models, the photos and the collision
+> grids are stored as AES-256-GCM ciphertext and cannot be read without the
+> site password. See [Password protection](#password-protection) for the
+> details and the remaining caveats.
+
 | Page | What it shows |
 | --- | --- |
 | `index.html` | Overview: room cards, photo galleries, quick statistics |
@@ -26,6 +35,10 @@ The site is password protected and published with GitHub Pages.
 
 The PolyCam captures are in real-world scale (one unit = one metre), so the
 measurements are actual distances.
+
+The **Lock** button in the header clears the unlock state and the stored
+decryption key, so you can hand the screen over without leaving the site
+open.
 
 ### Collision
 
@@ -163,3 +176,26 @@ node tools/test_visitor_journey.mjs  # a fresh visitor: encrypted files, unlock,
   `assets/vendor/three/`.
 * [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh) — MIT licence.
 * [gltf-pipeline](https://github.com/donmccurdy/gltf-pipeline) — Apache 2.0.
+
+## Deployment
+
+`.github/workflows/pages.yml` publishes the `site/` folder to GitHub Pages on
+every push to `main`. To deploy a change:
+
+```bash
+git add -A
+git commit -m "..."
+git push origin main
+```
+
+Then watch the run:
+
+```bash
+gh run list --repo wingkinlui/newlabblock
+gh run watch --repo wingkinlui/newlabblock
+```
+
+> **Important:** if you re-run the asset build scripts, the published assets
+> become plaintext again. Always finish with `tools/encrypt_assets.py` before
+> committing, or the models and photos would be readable in the repository.
+
