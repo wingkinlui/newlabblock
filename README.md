@@ -184,10 +184,19 @@ than opening the files directly.
 
 ```bash
 cd site
-node tools/test_site.mjs          # end-to-end: gate, pages, 3D viewer, measuring
-node tools/test_collision.mjs     # the camera never leaves the walkable floor
+node tools/test_site.mjs             # end-to-end: gate, pages, 3D viewer, measuring
+node tools/test_collision.mjs        # the camera never leaves the walkable floor
+node tools/test_clip_modes.mjs       # clipping and solid objects really differ
 node tools/test_visitor_journey.mjs  # a fresh visitor: encrypted files, unlock, browse
+node tools/test_returning_visitor.mjs # a returning visitor (service worker active)
+node tools/test_service_worker.mjs   # a new deployment reaches a returning visitor
+node tools/test_subdir.mjs           # works from a sub-directory (project pages)
 ```
+
+> The last two matter: the service worker caches the site, so a returning
+> visitor can otherwise keep running an old build. `test_returning_visitor.mjs`
+> and `test_service_worker.mjs` use a *persistent browser profile* to
+> reproduce that situation.
 
 ## Credits
 
@@ -217,4 +226,17 @@ gh run watch --repo wingkinlui/newlabblock
 > **Important:** if you re-run the asset build scripts, the published assets
 > become plaintext again. Always finish with `tools/encrypt_assets.py` before
 > committing, or the models and photos would be readable in the repository.
+
+### Caching
+
+The site is served through a Service Worker so that it keeps working offline.
+It is **network first**: the files are always fetched from the server when
+there is a connection, and the cache is only used when there is not.
+
+> **When you change the site files, bump `CACHE` in `site/sw.js`.** The cache
+> name is what tells the browser that a new build has been deployed - without
+> it a returning visitor can keep running the previous version. The worker
+> also shows a "a new version of the site is available" bar, but bumping the
+> version is what makes sure everybody gets the new files.
+
 

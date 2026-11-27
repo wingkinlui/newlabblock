@@ -109,3 +109,24 @@ html.is-locked body > *:not(.gate) {
   border-color: var(--accent-2);
   text-decoration: none;
 }
+
+/* "a new version is available" bar */
+.update-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  background: rgba(15, 21, 29, .96);
+  border: 1px solid var(--accent);
+  border-radius: 11px;
+  padding: .55rem .9rem;
+  font-size: .88rem;
+  color: var(--text);
+  box-shadow: var(--shadow);
+  animation: gate-in .2s ease-out;
+}
+

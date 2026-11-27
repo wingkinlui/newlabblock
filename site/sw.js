@@ -6,11 +6,19 @@
    key derived from the site password.  The worker therefore does not need to
    hide them - it cannot read them either.
 
-   What the worker does provide is offline caching, so the site keeps working
-   (and the models stay browsable) without a network connection.
+   Caching strategy
+   ----------------
+   The site files (HTML, CSS, JS) are fetched **network first** and only fall
+   back to the cache when the network is unavailable.  A cache-first worker
+   would keep serving an old build after a deploy - which is exactly the bug
+   that made the "clip through objects" feature appear to do nothing: the
+   page was still running the previous viewer.js from the cache.
+
+   The big assets (models, photos) are fetched from the network as well, but
+   they are cached afterwards so that a second visit works offline.
    ========================================================================== */
 
-const CACHE = 'nlb-site-v3';
+const CACHE = 'nlb-site-v4';
 
 const SHELL = [
   './',
@@ -31,15 +39,30 @@ const SHELL = [
   'assets/manifest.json',
 ];
 
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'NLB_SKIP_WAITING') {
+    // The page asked to activate the new worker straight away.
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).catch(() => {}),
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll(SHELL).catch(() => {});
+    // A changed sw.js means a new build has been deployed.  Tell the open
+    // pages so they can offer a reload instead of silently running the old
+    // code.
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach((client) => client.postMessage({ type: 'NLB_NEW_VERSION' }));
+  })());
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
+    // Drop every cache from an older version of the site.
     const keys = await caches.keys();
     await Promise.all(
       keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)),
@@ -55,22 +78,32 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  event.respondWith((async () => {
-    const cache = await caches.open(CACHE);
+  // Range requests (used when streaming media) must not be intercepted.
+  if (request.headers.has('range')) return;
+
+  event.respondWith(networkFirst(request));
+});
+
+/**
+ * Fetch from the network and fall back to the cache.
+ *
+ * The response is always the fresh one when the network is reachable, so a
+ * new deployment is picked up immediately.
+ */
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok && response.type === 'basic') {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (err) {
+    // Offline: use the cached copy.
     const cached = await cache.match(request);
     if (cached) return cached;
-
-    try {
-      const response = await fetch(request);
-      if (response.ok && response.type === 'basic') {
-        cache.put(request, response.clone());
-      }
-      return response;
-    } catch (err) {
-      // Offline fallback for the shell pages.
-      const fallback = await cache.match('./index.html');
-      if (fallback) return fallback;
-      throw err;
-    }
-  })());
-});
+    const fallback = await cache.match('./index.html');
+    if (fallback) return fallback;
+    throw err;
+  }
+}

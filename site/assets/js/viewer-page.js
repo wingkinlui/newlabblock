@@ -1,8 +1,9 @@
 /* Page controller for 3d.html: wires the LabViewer to the DOM. */
 
-import { requireAuth, initLockButton } from './auth.js';
+import { requireAuth, initLockButton, initUpdateNotice } from './auth.js';
 await requireAuth();
 initLockButton();
+initUpdateNotice();
 
 import { loadManifest, formatBytes, formatMetres } from './common.js';
 import { LabViewer } from './viewer.js';

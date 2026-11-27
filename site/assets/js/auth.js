@@ -107,6 +107,38 @@ function notifyServiceWorkerUnlocked() {
     .catch(() => {});
 }
 
+/**
+ * Show a "new version available" bar when the service worker has picked up a
+ * fresh build.
+ *
+ * Without this a returning visitor can keep running an old build (and miss
+ * new features) until they happen to force a reload.
+ */
+export function initUpdateNotice() {
+  if (!('serviceWorker' in navigator)) return;
+
+  const show = () => {
+    if (document.querySelector('.update-notice')) return;
+    const bar = document.createElement('div');
+    bar.className = 'update-notice';
+    bar.innerHTML = `
+      <span>A new version of the site is available.</span>
+      <button class="mini-btn" id="update-reload">Reload</button>`;
+    document.body.appendChild(bar);
+    bar.querySelector('#update-reload').addEventListener('click', () => {
+      // Skip the waiting phase so the new worker takes over immediately.
+      navigator.serviceWorker.getRegistration()
+        .then((reg) => reg?.waiting?.postMessage({ type: 'NLB_SKIP_WAITING' }))
+        .catch(() => {});
+      location.reload();
+    });
+  };
+
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'NLB_NEW_VERSION') show();
+  });
+}
+
 /* ------------------------------------------------------------------ gate */
 
 function buildGate() {

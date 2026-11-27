@@ -17,7 +17,8 @@ SITE = Path(__file__).resolve().parent.parent / "site"
 PAGES = ["index.html", "3d.html", "floorplan.html", "snapshots.html"]
 
 AUTH_CSS = '<link rel="stylesheet" href="assets/css/auth.css">'
-AUTH_IMPORT = ("import { requireAuth, initLockButton } from './assets/js/auth.js';")
+AUTH_IMPORT = ("import { requireAuth, initLockButton, initUpdateNotice } "
+               "from './assets/js/auth.js';")
 
 
 def patch(text: str) -> str:
@@ -29,20 +30,23 @@ def patch(text: str) -> str:
         )
 
     # 2. import + await gate before the rest of the module script
-    if AUTH_IMPORT not in text:
+    old_import = "import { requireAuth, initLockButton } from './assets/js/auth.js';"
+    if old_import in text:
+        text = text.replace(old_import, AUTH_IMPORT)
+    elif AUTH_IMPORT not in text:
         text = text.replace(
             "<script type=\"module\">\n",
             f"<script type=\"module\">\n{AUTH_IMPORT}\nawait requireAuth();\n",
             1,
         )
 
-    # 3. lock button
+    # 3. lock button + update notice
     if "initLockButton();" not in text:
         marker = "await requireAuth();\n"
         idx = text.find(marker)
         if idx != -1:
             text = (text[:idx + len(marker)]
-                    + "initLockButton();\n"
+                    + "initLockButton();\ninitUpdateNotice();\n"
                     + text[idx + len(marker):])
 
     return text
