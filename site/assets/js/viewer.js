@@ -38,6 +38,21 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * Convert a compass-style heading (degrees, 0 = +X, growing towards +Z) into
+ * a Three.js camera yaw.
+ *
+ * With yaw = 0 the camera looks down -Z, and the forward vector is
+ * (-sin yaw, -cos yaw).  The heading produced by tools/build_collision.py
+ * points along (cos h, sin h), so the two conventions have to be matched:
+ *
+ *     yaw = atan2(-cos h, -sin h)
+ */
+function headingToYaw(degrees) {
+  const rad = THREE.MathUtils.degToRad(degrees);
+  return Math.atan2(-Math.cos(rad), -Math.sin(rad));
+}
+
 /** Decode the run-length encoded collision grid into a Uint8Array. */
 function decodeGrid(collision) {
   const w = collision.width;
@@ -74,25 +89,31 @@ export class LabViewer {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    // The textures are already exposed correctly, so no tone mapping is
+    // needed - it would only wash the pictures out.
+    this.renderer.toneMapping = THREE.NoToneMapping;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0b0f14);
 
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.02, 120);
 
-    // Lighting: the captures carry their own textures, so a soft ambient
-    // light plus a directional light is enough to read the geometry.
-    this.scene.add(new THREE.AmbientLight(0xffffff, 1.55));
-    const hemi = new THREE.HemisphereLight(0xdfefff, 0x50555c, 1.1);
+    // Lighting: the captures carry their own textures, so the lights only
+    // need to be strong enough to give the geometry some shape.  PolyCam's
+    // materials are metallic; prepareMaterial() turns them into diffuse
+    // surfaces, otherwise everything would render black.
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const hemi = new THREE.HemisphereLight(0xeaf4ff, 0x707782, 0.75);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.35);
+    const sun = new THREE.DirectionalLight(0xffffff, 0.95);
     sun.position.set(4, 9, 6);
     this.scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xcfe6ff, 0.45);
+    const fill = new THREE.DirectionalLight(0xcfe6ff, 0.35);
     fill.position.set(-6, 4, -5);
     this.scene.add(fill);
+    const back = new THREE.DirectionalLight(0xffffff, 0.25);
+    back.position.set(0, 5, -8);
+    this.scene.add(back);
 
     this.yaw = 0;
     this.pitch = 0;
@@ -232,6 +253,7 @@ export class LabViewer {
       } catch (err) {
         console.warn('BVH build failed', err);
       }
+      this.prepareMaterial(child.material);
       this.pickables.push(child);
     });
 
@@ -241,7 +263,7 @@ export class LabViewer {
     const spawn = this.collision?.spawn || modelInfo.spawn || [0, EYE_HEIGHT, 0];
     const heading = this.collision?.heading ?? modelInfo.heading ?? 0;
     this.position.set(spawn[0], spawn[1], spawn[2]);
-    this.yaw = THREE.MathUtils.degToRad(heading);
+    this.yaw = headingToYaw(heading);
     this.pitch = 0;
     this.floorY = this.collision?.floorY ?? modelInfo.floorY ?? 0;
     this.updateCamera();
@@ -448,8 +470,32 @@ export class LabViewer {
     if (!this.collision) return;
     const spawn = this.collision.spawn;
     this.position.set(spawn[0], spawn[1], spawn[2]);
-    this.yaw = THREE.MathUtils.degToRad(this.collision.heading);
+    this.yaw = headingToYaw(this.collision.heading);
     this.pitch = 0;
     this.updateCamera();
+  }
+
+  /**
+   * Fix up the materials of a PolyCam capture.
+   *
+   * PolyCam writes fully metallic materials (metalness = 1).  A metal with no
+   * environment map reflects nothing and therefore renders almost black, so
+   * the capture comes out very dark.  The texture already carries all the
+   * colour information, so the material is turned into a plain diffuse
+   * surface instead.
+   */
+  prepareMaterial(material) {
+    const materials = Array.isArray(material) ? material : [material];
+    for (const mat of materials) {
+      if (!mat) continue;
+      if (mat.metalness !== undefined) mat.metalness = 0;
+      if (mat.roughness !== undefined) mat.roughness = 0.9;
+      if (mat.envMapIntensity !== undefined) mat.envMapIntensity = 0;
+      // Keep the texture in the correct colour space.
+      if (mat.map && mat.map.colorSpace !== THREE.SRGBColorSpace) {
+        mat.map.colorSpace = THREE.SRGBColorSpace;
+      }
+      mat.needsUpdate = true;
+    }
   }
 }
