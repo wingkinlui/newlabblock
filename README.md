@@ -13,7 +13,7 @@ The site is password protected and published with GitHub Pages.
 > *content* is still protected: the 3D models, the photos and the collision
 > grids are stored as AES-256-GCM ciphertext and cannot be read without the
 > site password. See [Password protection](#password-protection) for the
-> details and the remaining caveats.
+> details, and for what to do if the repository is ever switched to private.
 
 | Page | What it shows |
 | --- | --- |
@@ -114,10 +114,28 @@ protection is built into the files themselves:
 > extracted from the published site without the password, and the page content
 > is hidden until someone enters it. The remaining exposure is that the
 > *page code* itself is public — an attacker can see how the gate works.
-> That is inherent to a static host. If you need stronger guarantees, keep
-> the repository private as well (GitHub free accounts support private
-> repositories with Pages), or host the site somewhere with real server-side
-> authentication such as Cloudflare Access or Netlify password protection.
+> That is inherent to a static host.
+>
+> **The repository has to be public.** GitHub's free plan does not support
+> Pages for private repositories, so the repository is public. That is *not*
+> a problem for your data: the models, photos and collision grids are stored
+> as AES-256-GCM ciphertext, so a visitor who clones the repository gets
+> unreadable files (verified: the published `.glb` starts with `57 90 4E B4`
+> rather than the `glTF` magic bytes, and the photos are not JPEGs).
+>
+> **Do not make the repository private** unless you are prepared to lose the
+> site: switching a repository to private *deletes* its GitHub Pages
+> deployment, and switching it back to public does **not** bring the site
+> back automatically. The Pages site has to be recreated:
+>
+> ```bash
+> gh api repos/<owner>/<repo>/pages -X POST -f build_type=workflow
+> gh workflow run pages.yml --repo <owner>/<repo>
+> ```
+>
+> If the content ever has to stay truly private, host it somewhere with real
+> server-side authentication (Cloudflare Access, Netlify password protection)
+> or with a GitHub plan that supports Pages on private repositories.
 
 ### Changing the password
 
@@ -243,6 +261,19 @@ Then watch the run:
 gh run list --repo wingkinlui/newlabblock
 gh run watch --repo wingkinlui/newlabblock
 ```
+
+### If the site goes down
+
+The most likely cause is that the repository was switched to private: GitHub
+deletes the Pages deployment, and switching back to public does not restore
+it. One command fixes everything:
+
+```bash
+python tools/restore_pages.py
+```
+
+It recreates the Pages site and triggers a deployment. Use `--dry-run` first
+if you just want to see what it would do.
 
 > **Important:** if you re-run the asset build scripts, the published assets
 > become plaintext again. Always finish with `tools/encrypt_assets.py` before
