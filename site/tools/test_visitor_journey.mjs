@@ -10,7 +10,7 @@
 import puppeteer from 'puppeteer-core';
 
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const BASE = 'http://127.0.0.1:8099';
+const BASE = process.argv[2] || 'http://127.0.0.1:8099';
 const PASSWORD = 'tfcbioinform113';
 
 const browser = await puppeteer.launch({
